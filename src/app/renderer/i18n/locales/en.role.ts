@@ -1,0 +1,30 @@
+export const enRole = {
+  roleCreator: {
+    title: 'New Role',
+    editTitle: 'Edit Role',
+    name: 'Role name',
+    namePlaceholder: 'e.g. Product Manager',
+    description: 'Description',
+    descriptionPlaceholder: 'Summarize when to use this role...',
+    promptTemplate: 'Prompt template',
+    promptTemplatePlaceholder: 'Define this role, its responsibilities, and working style...',
+    nameRequired: 'Role name is required.',
+    promptRequired: 'Prompt template is required.',
+    duplicateName: 'A role with this name already exists in this project.',
+  },
+  roleActions: {
+    more: 'Role actions',
+    confirmDelete: 'Delete again',
+  },
+  roleNode: {
+    agent: 'Agent',
+    deleteRoleNode: 'Delete role window',
+    input: 'Input',
+    inputHint: 'Provide input for this role...',
+    run: 'Run',
+    lastRun: 'Last run {{timestamp}}',
+    noRuns: 'Not run yet',
+    missingRoleDefinition: 'This role definition is missing.',
+    edgeLabel: 'Role run: {{role}}',
+  },
+} as const
