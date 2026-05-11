@@ -1,15 +1,5 @@
-import { toFileUri } from '@contexts/filesystem/domain/fileUri'
-import {
-  resolveAgentExecutablePathOverride,
-  resolveAgentLaunchEnv,
-} from '@contexts/settings/domain/agentSettings'
 import { isResumeSessionBindingVerified } from '../../../utils/agentResumeBinding'
 import { toErrorMessage } from '../helpers'
-import type {
-  LaunchAgentSessionResult,
-  ListMountsResult,
-  TerminalRuntimeKind,
-} from '@shared/contracts/dto'
 import {
   assignAgentNodeToTaskSpace,
   createTaskAgentAnchor,
@@ -19,6 +9,12 @@ import {
   type ResumeTaskAgentSessionContext,
 } from './useTaskActions.agentSession.shared'
 import { resolveDefaultAgentLaunchGeometry } from './agentLaunchGeometry'
+import {
+  buildMergedAgentLaunchEnv,
+  launchWorkspaceAgentSession,
+  resolveAgentExecutableOverride,
+  resolveWorkspaceAgentLaunchBinding,
+} from './useWorkspaceAgentLaunch.shared'
 
 export async function resumeTaskAgentSessionAction(
   taskNodeId: string,
@@ -56,124 +52,84 @@ export async function resumeTaskAgentSessionAction(
   }
 
   const taskSpace = findTaskSpace(taskNodeId, context.spacesRef)
-  let mountId = taskSpace?.targetMountId ?? null
-  let taskDirectory =
+  const taskDirectory =
     taskSpace && taskSpace.directoryPath.trim().length > 0
       ? taskSpace.directoryPath.trim()
       : context.workspacePath
+  const resumeExecutionDirectory =
+    record.boundDirectory.trim().length > 0 ? record.boundDirectory.trim() : taskDirectory
 
-  const normalizedWorkspaceId =
-    typeof context.workspaceId === 'string' ? context.workspaceId.trim() : ''
-
-  if (!mountId && normalizedWorkspaceId.length > 0) {
-    const controlSurfaceInvoke = (
-      window as unknown as { opencoveApi?: { controlSurface?: { invoke?: unknown } } }
-    ).opencoveApi?.controlSurface?.invoke
-
-    if (typeof controlSurfaceInvoke === 'function') {
-      try {
-        const mountResult = await window.opencoveApi.controlSurface.invoke<ListMountsResult>({
-          kind: 'query',
-          id: 'mount.list',
-          payload: { projectId: normalizedWorkspaceId },
-        })
-
-        const defaultMount = mountResult.mounts[0] ?? null
-        if (defaultMount) {
-          mountId = defaultMount.mountId
-          taskDirectory = defaultMount.rootPath
-        }
-      } catch (error) {
-        setTaskLastError({
-          taskNodeId,
-          message: context.t('messages.mountListFailed', { message: toErrorMessage(error) }),
-          setNodes: context.setNodes,
-        })
-        context.onRequestPersistFlush?.()
-        return
-      }
-    }
+  let initialBinding: Awaited<ReturnType<typeof resolveWorkspaceAgentLaunchBinding>>
+  try {
+    initialBinding = await resolveWorkspaceAgentLaunchBinding({
+      workspaceId: context.workspaceId,
+      workspacePath: context.workspacePath,
+      currentMountId: taskSpace?.targetMountId ?? null,
+      executionDirectory: resumeExecutionDirectory,
+      targetSpace: taskSpace,
+      spacesRef: context.spacesRef,
+      onSpacesChange: context.onSpacesChange,
+      onRequestPersistFlush: context.onRequestPersistFlush,
+      mountQueryFailurePolicy: 'throw',
+    })
+  } catch (error) {
+    setTaskLastError({
+      taskNodeId,
+      message: context.t('messages.mountListFailed', { message: toErrorMessage(error) }),
+      setNodes: context.setNodes,
+    })
+    context.onRequestPersistFlush?.()
+    return
   }
 
-  const env = resolveAgentLaunchEnv(context.agentSettings, record.provider)
-  const executablePathOverride = resolveAgentExecutablePathOverride(
+  const executablePathOverride = resolveAgentExecutableOverride(
     context.agentSettings,
     record.provider,
+  )
+  const mergedEnv = buildMergedAgentLaunchEnv(
+    context.agentSettings,
+    record.provider,
+    context.environmentVariables,
   )
   const launchGeometry = resolveDefaultAgentLaunchGeometry({
     bucket: context.agentSettings.standardWindowSizeBucket,
     provider: record.provider,
     terminalFontSize: context.agentSettings.terminalFontSize,
   })
-  const mergedEnv =
-    context.environmentVariables && Object.keys(context.environmentVariables).length > 0
-      ? { ...env, ...context.environmentVariables }
-      : env
 
   try {
-    let launchedSessionId = ''
-    let launchedProfileId: string | null = null
-    let launchedRuntimeKind: TerminalRuntimeKind | undefined = undefined
-    let launchedEffectiveModel: string | null = null
-    let launchedResumeSessionId: string | null = record.resumeSessionId
-    let agentDirectory = record.boundDirectory
-
-    if (mountId) {
-      const cwd =
-        record.boundDirectory.trim().length > 0 ? record.boundDirectory.trim() : taskDirectory
-      const cwdUri = cwd.trim().length > 0 ? toFileUri(cwd.trim()) : null
-      const launched = await window.opencoveApi.controlSurface.invoke<LaunchAgentSessionResult>({
-        kind: 'command',
-        id: 'session.launchAgentInMount',
-        payload: {
-          mountId,
-          cwdUri,
-          prompt: record.prompt,
-          provider: record.provider,
-          mode: 'resume',
-          model: record.model,
-          resumeSessionId: record.resumeSessionId,
-          ...(executablePathOverride ? { executablePathOverride } : {}),
-          ...(Object.keys(mergedEnv).length > 0 ? { env: mergedEnv } : {}),
-          agentFullAccess: context.agentSettings.agentFullAccess,
-          cols: launchGeometry.terminalGeometry.cols,
-          rows: launchGeometry.terminalGeometry.rows,
-        },
-      })
-
-      launchedSessionId = launched.sessionId
-      launchedProfileId = launched.profileId
-      launchedRuntimeKind = launched.runtimeKind ?? undefined
-      launchedEffectiveModel = launched.effectiveModel
-      launchedResumeSessionId = record.resumeSessionId
-      agentDirectory = launched.executionContext.workingDirectory
-    } else {
-      const launched = await window.opencoveApi.agent.launch({
-        provider: record.provider,
-        cwd: record.boundDirectory,
-        profileId: context.agentSettings.defaultTerminalProfileId,
-        prompt: record.prompt,
-        mode: 'resume',
-        model: record.model,
-        resumeSessionId: record.resumeSessionId,
-        ...(executablePathOverride ? { executablePathOverride } : {}),
-        ...(Object.keys(mergedEnv).length > 0 ? { env: mergedEnv } : {}),
-        agentFullAccess: context.agentSettings.agentFullAccess,
-        cols: launchGeometry.terminalGeometry.cols,
-        rows: launchGeometry.terminalGeometry.rows,
-      })
-
-      launchedSessionId = launched.sessionId
-      launchedProfileId = launched.profileId ?? null
-      launchedRuntimeKind = launched.runtimeKind
-      launchedEffectiveModel = launched.effectiveModel
-      launchedResumeSessionId = record.resumeSessionId
-    }
+    const launched = await launchWorkspaceAgentSession({
+      mountId: initialBinding.mountId,
+      executionDirectory: initialBinding.executionDirectory,
+      prompt: record.prompt,
+      provider: record.provider,
+      mode: 'resume',
+      model: record.model,
+      resumeSessionId: record.resumeSessionId,
+      executablePathOverride,
+      mergedEnv,
+      agentSettings: context.agentSettings,
+      launchGeometry,
+      retryResolveMountBinding: async failedMountId => {
+        const nextBinding = await resolveWorkspaceAgentLaunchBinding({
+          workspaceId: context.workspaceId,
+          workspacePath: context.workspacePath,
+          currentMountId: null,
+          executionDirectory: resumeExecutionDirectory,
+          targetSpace: taskSpace,
+          spacesRef: context.spacesRef,
+          onSpacesChange: context.onSpacesChange,
+          onRequestPersistFlush: context.onRequestPersistFlush,
+          mountQueryFailurePolicy: 'throw',
+        })
+        return nextBinding.mountId && nextBinding.mountId !== failedMountId ? nextBinding : null
+      },
+    })
 
     const createdAgentNode = await context.createNodeForSession({
-      sessionId: launchedSessionId,
-      profileId: launchedProfileId,
-      runtimeKind: launchedRuntimeKind,
+      sessionId: launched.sessionId,
+      profileId: launched.profileId,
+      runtimeKind: launched.runtimeKind,
       terminalGeometry: launchGeometry.terminalGeometry,
       title: context.buildAgentNodeTitle(record.provider, taskNode.data.title),
       anchor: createTaskAgentAnchor(taskNode),
@@ -186,12 +142,12 @@ export async function resumeTaskAgentSessionAction(
         provider: record.provider,
         prompt: record.prompt,
         model: record.model,
-        effectiveModel: launchedEffectiveModel,
+        effectiveModel: launched.effectiveModel,
         launchMode: 'resume',
-        resumeSessionId: launchedResumeSessionId,
+        resumeSessionId: record.resumeSessionId,
         resumeSessionIdVerified: true,
-        executionDirectory: agentDirectory,
-        expectedDirectory: mountId ? agentDirectory : taskDirectory,
+        executionDirectory: launched.executionDirectory,
+        expectedDirectory: initialBinding.mountId ? launched.executionDirectory : taskDirectory,
         directoryMode: 'workspace',
         customDirectory: null,
         shouldCreateDirectory: false,

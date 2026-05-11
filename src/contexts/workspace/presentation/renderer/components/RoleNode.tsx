@@ -185,7 +185,7 @@ export function RoleNode({
           className="role-node__input nodrag nowheel"
           data-testid="role-node-input"
           value={inputDraft}
-          placeholder={t('roleNode.inputHint')}
+          placeholder={role.inputHint.trim().length > 0 ? role.inputHint : t('roleNode.inputHint')}
           onPointerDownCapture={event => {
             event.stopPropagation()
           }}

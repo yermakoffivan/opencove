@@ -83,6 +83,36 @@ export function RoleCreatorWindow({
               }}
             />
           </div>
+
+          <div className="cove-window__field-row">
+            <label htmlFor="workspace-role-input-hint">{t('roleCreator.inputHint')}</label>
+            <input
+              id="workspace-role-input-hint"
+              data-testid="workspace-role-input-hint-input"
+              value={roleCreator.inputHint}
+              disabled={isDisabled}
+              placeholder={t('roleCreator.inputHintPlaceholder')}
+              onChange={event => {
+                const inputHint = event.target.value
+                setRoleCreator(prev => (prev ? { ...prev, inputHint, error: null } : prev))
+              }}
+            />
+          </div>
+
+          <div className="cove-window__field-row">
+            <label htmlFor="workspace-role-output-format">{t('roleCreator.outputFormat')}</label>
+            <input
+              id="workspace-role-output-format"
+              data-testid="workspace-role-output-format-input"
+              value={roleCreator.outputFormat}
+              disabled={isDisabled}
+              placeholder={t('roleCreator.outputFormatPlaceholder')}
+              onChange={event => {
+                const outputFormat = event.target.value
+                setRoleCreator(prev => (prev ? { ...prev, outputFormat, error: null } : prev))
+              }}
+            />
+          </div>
         </div>
 
         {roleCreator.error ? <p className="cove-window__error">{roleCreator.error}</p> : null}

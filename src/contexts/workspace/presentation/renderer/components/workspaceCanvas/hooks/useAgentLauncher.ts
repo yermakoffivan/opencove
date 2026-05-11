@@ -2,24 +2,26 @@ import { useCallback } from 'react'
 import type { Node } from '@xyflow/react'
 import { useTranslation } from '@app/renderer/i18n'
 import {
-  resolveAgentExecutablePathOverride,
   resolveAgentModel,
-  resolveAgentLaunchEnv,
   type AgentSettings,
   type StandardWindowSizeBucket,
 } from '@contexts/settings/domain/agentSettings'
-import { toFileUri } from '@contexts/filesystem/domain/fileUri'
 import { resolveSpaceWorkingDirectory } from '@contexts/space/application/resolveSpaceWorkingDirectory'
 import type { AgentNodeData, Point, TerminalNodeData, WorkspaceSpaceState } from '../../../types'
 import { clearResumeSessionBinding } from '../../../utils/agentResumeBinding'
 import { resolveNodePlacementAnchorFromViewportCenter, toErrorMessage } from '../helpers'
 import type { ContextMenuState, CreateNodeInput, ShowWorkspaceCanvasMessage } from '../types'
-import type { LaunchAgentSessionResult, ListMountsResult } from '@shared/contracts/dto'
 import {
   assignNodeToSpaceAndExpand,
   findContainingSpaceByAnchor,
 } from './useInteractions.spaceAssignment'
 import { resolveDefaultAgentLaunchGeometry } from './agentLaunchGeometry'
+import {
+  buildMergedAgentLaunchEnv,
+  launchWorkspaceAgentSession,
+  resolveAgentExecutableOverride,
+  resolveWorkspaceAgentLaunchBinding,
+} from './useWorkspaceAgentLaunch.shared'
 
 interface UseAgentLauncherParams {
   agentSettings: AgentSettings
@@ -91,106 +93,64 @@ export function useWorkspaceCanvasAgentLauncher({
             launchGeometry.frameSize,
           )
           const model = resolveAgentModel(agentSettings, provider)
-          const executablePathOverride = resolveAgentExecutablePathOverride(agentSettings, provider)
-          const env = resolveAgentLaunchEnv(agentSettings, provider)
+          const executablePathOverride = resolveAgentExecutableOverride(agentSettings, provider)
           const anchorSpace = findContainingSpaceByAnchor(spacesRef.current, cursorAnchor)
-          const mergedEnv =
-            environmentVariables && Object.keys(environmentVariables).length > 0
-              ? { ...env, ...environmentVariables }
-              : env
-          let mountId = anchorSpace?.targetMountId ?? null
-
-          if (!mountId && !anchorSpace && workspaceId.trim().length > 0) {
-            const controlSurfaceInvoke = (
-              window as unknown as { opencoveApi?: { controlSurface?: { invoke?: unknown } } }
-            ).opencoveApi?.controlSurface?.invoke
-
-            if (typeof controlSurfaceInvoke === 'function') {
-              try {
-                const mountResult =
-                  await window.opencoveApi.controlSurface.invoke<ListMountsResult>({
-                    kind: 'query',
-                    id: 'mount.list',
-                    payload: { projectId: workspaceId },
-                  })
-                mountId = mountResult.mounts[0]?.mountId ?? null
-              } catch (error) {
-                onShowMessage?.(
-                  t('messages.mountListFailed', { message: toErrorMessage(error) }),
-                  'error',
-                )
-                return
-              }
-            }
-          }
-          const fallbackExecutionDirectory = resolveSpaceWorkingDirectory(
-            anchorSpace,
-            workspacePath,
-          )
-
-          let launchedSessionId = ''
-          let launchedProfileId: string | null = null
-          let launchedRuntimeKind: CreateNodeInput['runtimeKind'] = undefined
-          let launchedEffectiveModel: string | null = null
-          let executionDirectory = fallbackExecutionDirectory
-
-          if (mountId) {
-            const spawnCwdUri =
-              anchorSpace?.targetMountId && anchorSpace.directoryPath.trim().length > 0
-                ? toFileUri(anchorSpace.directoryPath.trim())
-                : null
-
-            const launched =
-              await window.opencoveApi.controlSurface.invoke<LaunchAgentSessionResult>({
-                kind: 'command',
-                id: 'session.launchAgentInMount',
-                payload: {
-                  mountId,
-                  cwdUri: spawnCwdUri,
-                  prompt: '',
-                  provider,
-                  mode: 'new',
-                  model,
-                  ...(executablePathOverride ? { executablePathOverride } : {}),
-                  ...(Object.keys(mergedEnv).length > 0 ? { env: mergedEnv } : {}),
-                  agentFullAccess: agentSettings.agentFullAccess,
-                  cols: launchGeometry.terminalGeometry.cols,
-                  rows: launchGeometry.terminalGeometry.rows,
-                },
-              })
-
-            launchedSessionId = launched.sessionId
-            launchedProfileId = launched.profileId
-            launchedRuntimeKind = launched.runtimeKind ?? undefined
-            launchedEffectiveModel = launched.effectiveModel
-            executionDirectory = launched.executionContext.workingDirectory
-          } else {
-            const launched = await window.opencoveApi.agent.launch({
-              provider,
-              cwd: fallbackExecutionDirectory,
-              profileId: agentSettings.defaultTerminalProfileId,
-              prompt: '',
-              mode: 'new',
-              model,
-              ...(executablePathOverride ? { executablePathOverride } : {}),
-              ...(Object.keys(mergedEnv).length > 0 ? { env: mergedEnv } : {}),
-              agentFullAccess: agentSettings.agentFullAccess,
-              cols: launchGeometry.terminalGeometry.cols,
-              rows: launchGeometry.terminalGeometry.rows,
+          const mergedEnv = buildMergedAgentLaunchEnv(agentSettings, provider, environmentVariables)
+          let initialBinding: Awaited<ReturnType<typeof resolveWorkspaceAgentLaunchBinding>>
+          try {
+            initialBinding = await resolveWorkspaceAgentLaunchBinding({
+              workspaceId,
+              workspacePath,
+              currentMountId: anchorSpace?.targetMountId ?? null,
+              executionDirectory: resolveSpaceWorkingDirectory(anchorSpace, workspacePath),
+              targetSpace: anchorSpace,
+              spacesRef,
+              onSpacesChange,
+              onRequestPersistFlush,
+              mountQueryFailurePolicy: anchorSpace ? 'ignore' : 'throw',
             })
-
-            launchedSessionId = launched.sessionId
-            launchedProfileId = launched.profileId ?? null
-            launchedRuntimeKind = launched.runtimeKind
-            launchedEffectiveModel = launched.effectiveModel
+          } catch (error) {
+            onShowMessage?.(
+              t('messages.mountListFailed', { message: toErrorMessage(error) }),
+              'error',
+            )
+            return
           }
+          const launched = await launchWorkspaceAgentSession({
+            mountId: initialBinding.mountId,
+            executionDirectory: initialBinding.executionDirectory,
+            prompt: '',
+            provider,
+            mode: 'new',
+            model,
+            executablePathOverride,
+            mergedEnv,
+            agentSettings,
+            launchGeometry,
+            retryResolveMountBinding: async failedMountId => {
+              const nextBinding = await resolveWorkspaceAgentLaunchBinding({
+                workspaceId,
+                workspacePath,
+                currentMountId: null,
+                executionDirectory: initialBinding.executionDirectory,
+                targetSpace: anchorSpace,
+                spacesRef,
+                onSpacesChange,
+                onRequestPersistFlush,
+                mountQueryFailurePolicy: anchorSpace ? 'ignore' : 'throw',
+              })
+              return nextBinding.mountId && nextBinding.mountId !== failedMountId
+                ? nextBinding
+                : null
+            },
+          })
 
-          const modelLabel = launchedEffectiveModel ?? model
+          const modelLabel = launched.effectiveModel ?? model
 
           const created = await createNodeForSession({
-            sessionId: launchedSessionId,
-            profileId: launchedProfileId,
-            runtimeKind: launchedRuntimeKind,
+            sessionId: launched.sessionId,
+            profileId: launched.profileId,
+            runtimeKind: launched.runtimeKind as CreateNodeInput['runtimeKind'],
             terminalGeometry: launchGeometry.terminalGeometry,
             title: buildAgentNodeTitle(provider, modelLabel),
             anchor,
@@ -202,11 +162,11 @@ export function useWorkspaceCanvasAgentLauncher({
               provider,
               prompt: '',
               model,
-              effectiveModel: launchedEffectiveModel,
+              effectiveModel: launched.effectiveModel,
               launchMode: 'new',
               ...clearResumeSessionBinding(),
-              executionDirectory,
-              expectedDirectory: executionDirectory,
+              executionDirectory: launched.executionDirectory,
+              expectedDirectory: launched.executionDirectory,
               directoryMode: 'workspace',
               customDirectory: null,
               shouldCreateDirectory: false,
