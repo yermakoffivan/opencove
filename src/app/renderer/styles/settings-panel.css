@@ -7,10 +7,9 @@
   place-items: center;
   padding: 20px;
   overflow: hidden;
-  z-index: 100;
   transition:
-    background 180ms ease,
-    backdrop-filter 180ms ease;
+    background var(--cove-motion-normal) var(--cove-ease-standard),
+    backdrop-filter var(--cove-motion-normal) var(--cove-ease-standard);
 }
 
 .settings-panel {
@@ -20,7 +19,7 @@
   min-height: 0;
   background: var(--cove-settings-panel-background);
   border: 1px solid var(--cove-border-subtle);
-  border-radius: 20px;
+  border-radius: var(--cove-radius-2xl);
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr);
   overflow: hidden;
@@ -77,20 +76,8 @@
 }
 
 .settings-panel__close {
-  all: unset;
-  display: inline-grid;
-  width: 32px;
-  height: 32px;
   flex: 0 0 auto;
-  place-items: center;
-  border-radius: 9px;
   color: var(--cove-text-faint);
-  cursor: pointer;
-  font-size: calc(20px * var(--cove-ui-font-scale));
-  line-height: 1;
-  transition:
-    color 160ms ease,
-    background 160ms ease;
 }
 
 .settings-panel__close:hover {

@@ -1,5 +1,6 @@
 import type { JSX } from 'react'
 import { X } from 'lucide-react'
+import { IconButton } from '@app/renderer/components/ui/IconButton'
 import { useTranslation } from '@app/renderer/i18n'
 
 export function SettingsPanelHeader({
@@ -25,16 +26,16 @@ export function SettingsPanelHeader({
           </p>
         ) : null}
       </div>
-      <button
-        type="button"
+      <IconButton
+        size="md"
+        variant="ghost"
         className="settings-panel__close"
         data-testid="settings-panel-close"
-        aria-label={t('common.close')}
-        title={t('common.close')}
+        label={t('common.close')}
         onClick={onClose}
       >
         <X size={18} aria-hidden="true" />
-      </button>
+      </IconButton>
     </div>
   )
 }

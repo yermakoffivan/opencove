@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent, type Ref } from 'react'
 import {
   Bell,
   Bot,
@@ -50,12 +50,14 @@ const SETTINGS_PAGE_ICONS: Record<SettingsPageIconId, LucideIcon> = {
 }
 
 export function SettingsPanelSidebar({
+  searchInputRef,
   activePageId,
   workspaces,
   endpointsEnabled,
   onSelectPage,
   onSelectSearchResult,
 }: {
+  searchInputRef?: Ref<HTMLInputElement>
   activePageId: SettingsPageId
   workspaces: WorkspaceState[]
   endpointsEnabled: boolean
@@ -175,7 +177,7 @@ export function SettingsPanelSidebar({
         <div className="settings-panel__search-input-shell">
           <Search className="settings-panel__search-icon" size={14} aria-hidden="true" />
           <input
-            autoFocus
+            ref={searchInputRef}
             id="settings-panel-search"
             className="cove-field settings-panel__search-input"
             type="search"

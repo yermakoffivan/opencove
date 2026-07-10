@@ -1,15 +1,19 @@
-import React, { StrictMode, useRef } from 'react'
+import React, { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CoveSelect } from '../../../src/app/renderer/components/CoveSelect'
-import { useSettingsPanelDialog } from '../../../src/contexts/settings/presentation/renderer/useSettingsPanelDialog'
+import { Dialog } from '../../../src/app/renderer/components/ui/Dialog'
 
 function DialogHarness({ withSelect = false }: { withSelect?: boolean }): React.JSX.Element {
-  const panelRef = useRef<HTMLElement | null>(null)
-  useSettingsPanelDialog(panelRef)
-
   return (
-    <section ref={panelRef} data-testid="dialog-panel" tabIndex={-1}>
+    <Dialog
+      open
+      data-testid="dialog-panel"
+      inertRootSelector=".app-shell"
+      focusOutsideSelectors={['.cove-window']}
+      fallbackReturnFocusSelector='[data-testid="app-header-settings"]'
+      onDismiss={() => undefined}
+    >
       <button type="button" autoFocus>
         First setting
       </button>
@@ -26,7 +30,7 @@ function DialogHarness({ withSelect = false }: { withSelect?: boolean }): React.
         />
       ) : null}
       <button type="button">Last setting</button>
-    </section>
+    </Dialog>
   )
 }
 
@@ -62,7 +66,7 @@ afterEach(() => {
   document.body.replaceChildren()
 })
 
-describe('useSettingsPanelDialog', () => {
+describe('Dialog modal focus management', () => {
   it('makes only the background app shell inert while mounted', () => {
     const { appShell, settingsTrigger, outsideButton } = appendBackground()
     settingsTrigger.focus()
@@ -125,6 +129,20 @@ describe('useSettingsPanelDialog', () => {
     const modal = render(<DialogHarness />)
     temporaryTrigger.remove()
 
+    modal.unmount()
+    act(() => {
+      vi.runOnlyPendingTimers()
+    })
+
+    expect(settingsTrigger).toHaveFocus()
+  })
+
+  it('falls back to the header settings trigger when the dialog opens from body focus', () => {
+    vi.useFakeTimers()
+    const { settingsTrigger } = appendBackground()
+    expect(document.activeElement).toBe(document.body)
+
+    const modal = render(<DialogHarness />)
     modal.unmount()
     act(() => {
       vi.runOnlyPendingTimers()

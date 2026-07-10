@@ -3,16 +3,16 @@
   min-height: 34px;
   padding: 7px 14px;
   border: 1px solid color-mix(in srgb, var(--cove-accent) 68%, transparent);
-  border-radius: 9px;
+  border-radius: var(--cove-radius-sm);
   background: var(--cove-settings-primary-background);
   color: var(--cove-settings-on-accent);
   font-weight: 600;
   font-size: calc(13px * var(--cove-ui-font-scale));
   cursor: pointer;
   transition:
-    background 150ms ease,
-    border-color 150ms ease,
-    transform 120ms ease;
+    background var(--cove-motion-fast) var(--cove-ease-standard),
+    border-color var(--cove-motion-fast) var(--cove-ease-standard),
+    transform var(--cove-motion-fast) var(--cove-ease-standard);
 }
 
 .settings-panel button.primary:hover {
@@ -35,16 +35,16 @@
   min-height: 32px;
   padding: 6px 11px;
   border: 1px solid var(--cove-border);
-  border-radius: 9px;
+  border-radius: var(--cove-radius-sm);
   background: transparent;
   color: var(--cove-text);
   font-size: calc(12px * var(--cove-ui-font-scale));
   cursor: pointer;
   transition:
-    color 150ms ease,
-    background 150ms ease,
-    border-color 150ms ease,
-    transform 120ms ease;
+    color var(--cove-motion-fast) var(--cove-ease-standard),
+    background var(--cove-motion-fast) var(--cove-ease-standard),
+    border-color var(--cove-motion-fast) var(--cove-ease-standard),
+    transform var(--cove-motion-fast) var(--cove-ease-standard);
 }
 
 .settings-panel button.secondary:hover {
@@ -69,7 +69,7 @@
 }
 
 /* --- Toggle Switch --- */
-.cove-toggle {
+.settings-panel label.cove-toggle {
   position: relative;
   display: inline-flex;
   width: 36px;
@@ -78,54 +78,59 @@
   cursor: pointer;
 }
 
-.cove-toggle input {
+.settings-panel label.cove-toggle input {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
   opacity: 0;
-  width: 0;
-  height: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
 }
 
-.cove-toggle__slider {
+.settings-panel label.cove-toggle .cove-toggle__slider {
   position: absolute;
   inset: 0;
   border: 1px solid var(--cove-border);
-  border-radius: 999px;
+  border-radius: var(--cove-radius-round);
   background: var(--cove-field);
   transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--cove-motion-normal) var(--cove-ease-standard),
+    background var(--cove-motion-normal) var(--cove-ease-standard),
+    box-shadow var(--cove-motion-normal) var(--cove-ease-standard);
   pointer-events: none;
 }
 
-.cove-toggle__slider::before {
+.settings-panel label.cove-toggle .cove-toggle__slider::before {
   position: absolute;
   content: '';
   width: 14px;
   height: 14px;
   top: 2px;
   left: 2px;
-  border-radius: 50%;
+  border-radius: var(--cove-radius-round);
   background: var(--cove-text-muted);
   transition:
-    transform 160ms ease,
-    background 160ms ease;
+    transform var(--cove-motion-normal) var(--cove-ease-standard),
+    background var(--cove-motion-normal) var(--cove-ease-standard);
 }
 
-.cove-toggle input:checked + .cove-toggle__slider {
+.settings-panel label.cove-toggle input:checked + .cove-toggle__slider {
   border-color: var(--cove-accent);
   background: var(--cove-accent);
 }
 
-.cove-toggle input:checked + .cove-toggle__slider::before {
+.settings-panel label.cove-toggle input:checked + .cove-toggle__slider::before {
   transform: translateX(16px);
   background: var(--cove-settings-on-accent);
 }
 
-.cove-toggle input:focus-visible + .cove-toggle__slider {
+.settings-panel label.cove-toggle input:focus-visible + .cove-toggle__slider {
   box-shadow: 0 0 0 3px var(--cove-settings-focus-ring);
 }
 
-.cove-toggle input:disabled + .cove-toggle__slider {
+.settings-panel label.cove-toggle input:disabled + .cove-toggle__slider {
   cursor: not-allowed;
   opacity: 0.5;
 }

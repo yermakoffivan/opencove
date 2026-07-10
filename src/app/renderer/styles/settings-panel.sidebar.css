@@ -9,7 +9,7 @@
   scrollbar-gutter: stable;
   background: var(--cove-settings-sidebar-background);
   border-right: 1px solid var(--cove-border-subtle);
-  transition: background 180ms ease;
+  transition: background var(--cove-motion-normal) var(--cove-ease-standard);
 }
 
 .settings-panel__nav-sections {
@@ -49,14 +49,14 @@
   align-items: center;
   gap: 10px;
   padding: 0 10px;
-  border-radius: 9px;
+  border-radius: var(--cove-radius-sm);
   color: var(--cove-text-muted);
   cursor: pointer;
   font-size: calc(13px * var(--cove-ui-font-scale));
   line-height: 1.2;
   transition:
-    color 150ms ease,
-    background 150ms ease;
+    color var(--cove-motion-fast) var(--cove-ease-standard),
+    background var(--cove-motion-fast) var(--cove-ease-standard);
 }
 
 .settings-panel__nav-button:hover {
@@ -107,7 +107,7 @@
   height: 16px;
   flex: 0 0 16px;
   color: var(--cove-text-faint);
-  transition: color 150ms ease;
+  transition: color var(--cove-motion-fast) var(--cove-ease-standard);
 }
 
 .settings-panel__nav-button:hover .settings-panel__nav-button-icon,
@@ -140,7 +140,7 @@
   justify-content: space-between;
   gap: 8px;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: var(--cove-radius-sm);
   color: var(--cove-text-faint);
   cursor: pointer;
   font-size: calc(11px * var(--cove-ui-font-scale));
@@ -161,7 +161,7 @@
 .settings-panel__projects-toggle svg {
   width: 14px;
   height: 14px;
-  transition: transform 150ms ease;
+  transition: transform var(--cove-motion-fast) var(--cove-ease-standard);
 }
 
 .settings-panel__projects-toggle[aria-expanded='false'] svg {
@@ -188,7 +188,7 @@
     height: calc(100vh - 16px);
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
-    border-radius: 16px;
+    border-radius: var(--cove-radius-xl);
   }
 
   .settings-panel__sidebar {
